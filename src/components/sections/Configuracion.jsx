@@ -80,6 +80,23 @@ export function Configuracion() {
     window.location.reload();
   }
 
+  function importData(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        Object.entries(data).forEach(([k, v]) => storage.set(k, v));
+        window.location.reload();
+      } catch {
+        alert('Error al leer el archivo JSON.');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  }
+
   const Section = ({ title, children }) => (
     <div className="bg-white border border-gray-100 rounded-xl p-6 space-y-4">
       <h2 className="font-semibold text-gray-900">{title}</h2>
@@ -190,11 +207,15 @@ export function Configuracion() {
       </Section>
 
       <Section title="Datos">
-        <div className="flex gap-3">
+        <div className="flex gap-3 flex-wrap">
           <button onClick={exportData}
             className="flex-1 border border-gray-200 hover:bg-gray-50 text-gray-700 text-sm py-2 rounded-lg">
             Exportar todos mis datos (JSON)
           </button>
+          <label className="flex-1 border border-blue-200 hover:bg-blue-50 text-blue-700 text-sm py-2 rounded-lg text-center cursor-pointer">
+            Importar datos (JSON)
+            <input type="file" accept=".json" className="hidden" onChange={importData} />
+          </label>
           <button onClick={resetData}
             className="border border-red-200 hover:bg-red-50 text-red-600 text-sm px-4 py-2 rounded-lg">
             Resetear datos
