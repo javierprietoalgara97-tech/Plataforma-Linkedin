@@ -17,9 +17,8 @@ export function AppProvider({ children }) {
     if (!storage.get('initialized')) {
       const cats = defaultCategories.map(c => ({ ...c, id: genId() }));
       storage.set('categories', cats);
-      storage.set('posts', buildSamplePosts(cats));
+      storage.set('posts', []);
       storage.set('settings', defaultSettings);
-      storage.set('newsCache', { articles: sampleNews, timestamp: Date.now() });
       storage.set('initialized', true);
     }
   }, []);
