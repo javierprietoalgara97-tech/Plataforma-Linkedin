@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
+import * as XLSX from 'xlsx';
 import { useApp } from '../../context/AppContext';
 import { StatusBadge, CategoryBadge } from '../ui/Badge';
 import { Modal } from '../ui/Modal';
@@ -209,6 +210,160 @@ function MetricsModal({ post, onClose }) {
   );
 }
 
+function parseLinkedInExcel(buffer) {
+  const wb = XLSX.read(buffer, { type: 'array' });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
+
+  const get = (label) => {
+    const row = rows.find(r => typeof r[0] === 'string' && r[0].toLowerCase().includes(label.toLowerCase()));
+    return row ? String(row[1] || '').trim() : '';
+  };
+
+  const rawDate = get('Fecha de publicación');
+  let fecha = '';
+  if (rawDate) {
+    const parts = rawDate.split('/');
+    if (parts.length === 3) {
+      const [d, m, y] = parts;
+      fecha = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    }
+  }
+
+  return {
+    urlLinkedIn: get('URL de la publicación'),
+    fecha,
+    impresiones: parseInt(get('Impresiones')) || 0,
+    reacciones: parseInt(get('Reacciones')) || 0,
+    comentarios: parseInt(get('Comentarios')) || 0,
+    compartidos: parseInt(get('Veces compartido')) || 0,
+    guardados: parseInt(get('Veces guardado')) || 0,
+  };
+}
+
+function ImportLinkedInModal({ onClose }) {
+  const { addPost } = useApp();
+  const [parsed, setParsed] = useState([]);
+  const [importing, setImporting] = useState(false);
+  const [done, setDone] = useState(false);
+  const fileRef = useRef();
+
+  async function handleFiles(e) {
+    const files = Array.from(e.target.files);
+    const results = [];
+    for (const file of files) {
+      const buffer = await file.arrayBuffer();
+      try {
+        const data = parseLinkedInExcel(new Uint8Array(buffer));
+        results.push({ ...data, contenido: '', fileName: file.name });
+      } catch {
+        results.push({ error: true, fileName: file.name });
+      }
+    }
+    setParsed(results);
+  }
+
+  function handleImport() {
+    setImporting(true);
+    parsed.filter(p => !p.error).forEach(p => {
+      addPost({
+        contenido: p.contenido || `[Post de LinkedIn - ${p.fecha}]`,
+        urlLinkedIn: p.urlLinkedIn,
+        estado: 'publicado',
+        fechaProgramada: p.fecha || null,
+        esHistorico: true,
+        metricas: {
+          impresiones: p.impresiones,
+          reacciones: p.reacciones,
+          comentarios: p.comentarios,
+          compartidos: p.compartidos,
+          guardados: p.guardados,
+        },
+      });
+    });
+    setDone(true);
+    setImporting(false);
+  }
+
+  return (
+    <Modal title="Importar posts desde LinkedIn" onClose={onClose} wide>
+      {!done ? (
+        <div className="space-y-4">
+          <p className="text-sm text-gray-500">
+            Selecciona los archivos Excel exportados desde LinkedIn (uno por publicación). Puedes seleccionar varios a la vez.
+          </p>
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".xlsx"
+            multiple
+            onChange={handleFiles}
+            className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
+          />
+          {parsed.length > 0 && (
+            <div className="border border-gray-100 rounded-lg overflow-hidden">
+              <table className="w-full text-xs">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="text-left px-3 py-2 text-gray-400 font-medium">Fecha</th>
+                    <th className="text-right px-3 py-2 text-gray-400 font-medium">Impresiones</th>
+                    <th className="text-right px-3 py-2 text-gray-400 font-medium">Reacciones</th>
+                    <th className="text-right px-3 py-2 text-gray-400 font-medium">Comentarios</th>
+                    <th className="text-left px-3 py-2 text-gray-400 font-medium">URL</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {parsed.map((p, i) => p.error ? (
+                    <tr key={i} className="bg-red-50">
+                      <td colSpan={5} className="px-3 py-2 text-red-400">Error al leer: {p.fileName}</td>
+                    </tr>
+                  ) : (
+                    <tr key={i}>
+                      <td className="px-3 py-2 text-gray-600">{p.fecha || '—'}</td>
+                      <td className="px-3 py-2 text-right text-gray-600">{p.impresiones.toLocaleString()}</td>
+                      <td className="px-3 py-2 text-right text-gray-600">{p.reacciones}</td>
+                      <td className="px-3 py-2 text-right text-gray-600">{p.comentarios}</td>
+                      <td className="px-3 py-2 text-gray-400 truncate max-w-[150px]">
+                        <a href={p.urlLinkedIn} target="_blank" rel="noreferrer" className="text-blue-500 hover:underline" onClick={e => e.stopPropagation()}>
+                          Ver post
+                        </a>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <p className="text-xs text-gray-400">
+            El texto del post se importa vacío — puedes añadirlo después abriendo cada post y pegando el contenido.
+          </p>
+          <div className="flex justify-end gap-3 pt-2">
+            <button onClick={onClose} className="border border-gray-200 text-gray-600 text-sm px-4 py-2 rounded-lg hover:bg-gray-50">
+              Cancelar
+            </button>
+            <button
+              onClick={handleImport}
+              disabled={parsed.filter(p => !p.error).length === 0 || importing}
+              className="bg-blue-600 hover:bg-blue-700 text-white text-sm px-6 py-2 rounded-lg disabled:opacity-40"
+            >
+              Importar {parsed.filter(p => !p.error).length > 0 ? `${parsed.filter(p => !p.error).length} posts` : ''}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="text-center py-8">
+          <div className="text-4xl mb-3">✅</div>
+          <p className="text-gray-700 font-medium">{parsed.filter(p => !p.error).length} posts importados</p>
+          <p className="text-sm text-gray-400 mt-1">Ahora puedes abrir cada post y añadir el texto desde LinkedIn</p>
+          <button onClick={onClose} className="mt-6 bg-blue-600 hover:bg-blue-700 text-white text-sm px-6 py-2 rounded-lg">
+            Cerrar
+          </button>
+        </div>
+      )}
+    </Modal>
+  );
+}
+
 export function Biblioteca() {
   const { posts, categories, deletePost, addPost, navigateTo } = useApp();
   const [search, setSearch] = useState('');
@@ -220,6 +375,7 @@ export function Biblioteca() {
   const [showCategoryManager, setShowCategoryManager] = useState(false);
   const [showMetrics, setShowMetrics] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [showImport, setShowImport] = useState(false);
 
   const months = useMemo(() => {
     const set = new Set(posts.map(p => p.fechaProgramada?.slice(0, 7)).filter(Boolean));
@@ -289,6 +445,10 @@ export function Biblioteca() {
               className="border border-gray-200 hover:bg-gray-50 text-gray-700 text-sm px-4 py-2 rounded-lg">
               Categorías
             </button>
+            <button onClick={() => setShowImport(true)}
+              className="border border-blue-200 hover:bg-blue-50 text-blue-700 text-sm px-4 py-2 rounded-lg">
+              Importar LinkedIn
+            </button>
             <button onClick={() => setShowHistoric(true)}
               className="bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 py-2 rounded-lg">
               + Post histórico
@@ -357,6 +517,12 @@ export function Biblioteca() {
             {selectedPost.fechaProgramada && (
               <p className="text-xs text-gray-400 mt-3">{formatDate(selectedPost.fechaProgramada)}</p>
             )}
+            {selectedPost.urlLinkedIn && (
+              <a href={selectedPost.urlLinkedIn} target="_blank" rel="noreferrer"
+                className="mt-2 inline-block text-xs text-blue-500 hover:underline">
+                Ver post en LinkedIn →
+              </a>
+            )}
             {selectedPost.metricas && (
               <div className="mt-4 p-3 bg-gray-50 rounded-lg grid grid-cols-2 gap-2 text-xs">
                 {[['Impresiones', 'impresiones'], ['Reacciones', 'reacciones'], ['Comentarios', 'comentarios'], ['Compartidos', 'compartidos']].map(([label, key]) => (
@@ -400,6 +566,7 @@ export function Biblioteca() {
       {showHistoric && <HistoricModal onClose={() => setShowHistoric(false)} />}
       {showCategoryManager && <CategoryManager onClose={() => setShowCategoryManager(false)} />}
       {showMetrics && selectedPost && <MetricsModal post={selectedPost} onClose={() => { setShowMetrics(false); setSelectedPost(p => ({ ...posts.find(x => x.id === p.id) })); }} />}
+      {showImport && <ImportLinkedInModal onClose={() => setShowImport(false)} />}
     </div>
   );
 }
