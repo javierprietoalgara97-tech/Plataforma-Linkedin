@@ -25,7 +25,7 @@ function AppContent() {
   return (
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar />
-      <main className="ml-56 flex-1 min-h-screen">
+      <main className="md:ml-56 flex-1 min-h-screen pb-16 md:pb-0">
         <Section />
       </main>
     </div>

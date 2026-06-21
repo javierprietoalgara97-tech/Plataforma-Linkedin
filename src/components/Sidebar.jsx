@@ -10,59 +10,77 @@ const NAV = [
 ];
 
 const BOTTOM_NAV = [
-  { id: 'configuracion', label: 'Configuración', icon: '⚙' },
+  { id: 'configuracion', label: 'Config.', icon: '⚙' },
 ];
+
+const ALL_MOBILE = [...NAV, ...BOTTOM_NAV];
 
 export function Sidebar() {
   const { section, navigateTo } = useApp();
 
   return (
-    <aside className="w-56 h-screen bg-white border-r border-gray-100 flex flex-col fixed left-0 top-0 z-40">
-      {/* Logo */}
-      <div className="px-5 py-5 border-b border-gray-100">
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 bg-blue-600 rounded-lg flex items-center justify-center">
-            <span className="text-white text-xs font-bold">in</span>
+    <>
+      {/* Sidebar desktop */}
+      <aside className="hidden md:flex w-56 h-screen bg-white border-r border-gray-100 flex-col fixed left-0 top-0 z-40">
+        <div className="px-5 py-5 border-b border-gray-100">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 bg-blue-600 rounded-lg flex items-center justify-center">
+              <span className="text-white text-xs font-bold">in</span>
+            </div>
+            <span className="font-semibold text-gray-900 text-sm">LinkedIn Studio</span>
           </div>
-          <span className="font-semibold text-gray-900 text-sm">LinkedIn Studio</span>
         </div>
-      </div>
+        <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+          {NAV.map(item => (
+            <button
+              key={item.id}
+              onClick={() => navigateTo(item.id)}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors text-left ${
+                section === item.id
+                  ? 'bg-blue-50 text-blue-700 font-medium'
+                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+              }`}
+            >
+              <span className="text-base w-5 text-center">{item.icon}</span>
+              {item.label}
+            </button>
+          ))}
+        </nav>
+        <div className="px-3 py-4 border-t border-gray-100 space-y-0.5">
+          {BOTTOM_NAV.map(item => (
+            <button
+              key={item.id}
+              onClick={() => navigateTo(item.id)}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors text-left ${
+                section === item.id
+                  ? 'bg-blue-50 text-blue-700 font-medium'
+                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+              }`}
+            >
+              <span className="text-base w-5 text-center">{item.icon}</span>
+              {item.label}
+            </button>
+          ))}
+        </div>
+      </aside>
 
-      {/* Nav principal */}
-      <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-        {NAV.map(item => (
+      {/* Bottom nav móvil */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-100 flex items-center justify-around px-1 py-1 safe-area-pb">
+        {ALL_MOBILE.map(item => (
           <button
             key={item.id}
             onClick={() => navigateTo(item.id)}
-            className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors text-left ${
+            className={`flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-xl min-w-0 flex-1 transition-colors ${
               section === item.id
-                ? 'bg-blue-50 text-blue-700 font-medium'
-                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                ? 'text-blue-600'
+                : 'text-gray-400'
             }`}
           >
-            <span className="text-base w-5 text-center">{item.icon}</span>
-            {item.label}
+            <span className="text-lg leading-none">{item.icon}</span>
+            <span className="text-[9px] font-medium leading-none truncate w-full text-center">{item.label}</span>
           </button>
         ))}
       </nav>
-
-      {/* Nav inferior */}
-      <div className="px-3 py-4 border-t border-gray-100 space-y-0.5">
-        {BOTTOM_NAV.map(item => (
-          <button
-            key={item.id}
-            onClick={() => navigateTo(item.id)}
-            className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors text-left ${
-              section === item.id
-                ? 'bg-blue-50 text-blue-700 font-medium'
-                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-            }`}
-          >
-            <span className="text-base w-5 text-center">{item.icon}</span>
-            {item.label}
-          </button>
-        ))}
-      </div>
-    </aside>
+    </>
   );
 }
