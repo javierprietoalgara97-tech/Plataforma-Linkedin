@@ -75,8 +75,8 @@ export function Configuracion() {
   }
 
   function resetData() {
-    if (!window.confirm('¿Resetear todos los datos al estado inicial? Perderás tus posts y configuración.')) return;
-    storage.remove('initialized');
+    if (!window.confirm('¿Resetear todos los datos? Perderás tus posts, categorías y configuración.')) return;
+    ['initialized', 'posts', 'categories', 'settings', 'newsCache'].forEach(k => storage.remove(k));
     window.location.reload();
   }
 
