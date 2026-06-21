@@ -65,8 +65,51 @@ function CategoryManager({ onClose }) {
   );
 }
 
+function readFileAsDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => resolve({ dataUrl: e.target.result, nombre: file.name, tipo: file.type });
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function FileUploadField({ archivo, onChange }) {
+  const ref = useRef();
+  return (
+    <div>
+      <label className="text-xs text-gray-500 font-medium">Archivo adjunto (imagen, PDF, vídeo...)</label>
+      <div className="mt-1 flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => ref.current.click()}
+          className="border border-gray-200 hover:bg-gray-50 text-gray-600 text-xs px-3 py-1.5 rounded-lg"
+        >
+          {archivo ? 'Cambiar archivo' : 'Subir archivo'}
+        </button>
+        {archivo && (
+          <span className="text-xs text-gray-500 truncate max-w-[180px]">{archivo.nombre}</span>
+        )}
+        {archivo && (
+          <button type="button" onClick={() => onChange(null)} className="text-xs text-red-400 hover:text-red-600">✕</button>
+        )}
+      </div>
+      <input ref={ref} type="file" accept="image/*,video/*,.pdf,.doc,.docx,.ppt,.pptx" className="hidden"
+        onChange={async e => {
+          const file = e.target.files[0];
+          if (file) onChange(await readFileAsDataURL(file));
+          e.target.value = '';
+        }}
+      />
+      {archivo && archivo.tipo?.startsWith('image/') && (
+        <img src={archivo.dataUrl} alt="" className="mt-2 max-h-32 rounded-lg border border-gray-100 object-contain" />
+      )}
+    </div>
+  );
+}
+
 const EMPTY_METRICS = { impresiones: '', reacciones: '', comentarios: '', compartidos: '', verMas: '' };
-const EMPTY_HISTORIC = { contenido: '', categoria: '', fecha: '', ...EMPTY_METRICS };
+const EMPTY_HISTORIC = { contenido: '', categoria: '', fecha: '', archivo: null, ...EMPTY_METRICS };
 
 function HistoricModal({ onClose, addAnother = false }) {
   const { categories, addPost } = useApp();
@@ -82,6 +125,7 @@ function HistoricModal({ onClose, addAnother = false }) {
       estado: 'publicado',
       fechaProgramada: form.fecha || null,
       esHistorico: true,
+      archivo: form.archivo || null,
       metricas: {
         impresiones: Number(form.impresiones) || 0,
         reacciones: Number(form.reacciones) || 0,
@@ -113,13 +157,14 @@ function HistoricModal({ onClose, addAnother = false }) {
         <div>
           <label className="text-xs text-gray-500 font-medium">Contenido del post</label>
           <textarea
-            rows={6}
+            rows={5}
             value={form.contenido}
             onChange={e => setForm(f => ({ ...f, contenido: e.target.value }))}
             placeholder="Pega aquí el contenido del post..."
             className="w-full mt-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
           />
         </div>
+        <FileUploadField archivo={form.archivo} onChange={archivo => setForm(f => ({ ...f, archivo }))} />
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="text-xs text-gray-500 font-medium">Categoría</label>
@@ -244,34 +289,37 @@ function parseLinkedInExcel(buffer) {
 function ImportLinkedInModal({ onClose }) {
   const { addPost } = useApp();
   const [parsed, setParsed] = useState([]);
-  const [importing, setImporting] = useState(false);
   const [done, setDone] = useState(false);
-  const fileRef = useRef();
 
-  async function handleFiles(e) {
+  async function handleExcelFiles(e) {
     const files = Array.from(e.target.files);
     const results = [];
     for (const file of files) {
       const buffer = await file.arrayBuffer();
       try {
         const data = parseLinkedInExcel(new Uint8Array(buffer));
-        results.push({ ...data, contenido: '', fileName: file.name });
+        results.push({ ...data, contenido: '', archivo: null, fileName: file.name });
       } catch {
         results.push({ error: true, fileName: file.name });
       }
     }
     setParsed(results);
+    e.target.value = '';
+  }
+
+  function updateParsed(i, changes) {
+    setParsed(prev => prev.map((p, idx) => idx === i ? { ...p, ...changes } : p));
   }
 
   function handleImport() {
-    setImporting(true);
     parsed.filter(p => !p.error).forEach(p => {
       addPost({
-        contenido: p.contenido || `[Post de LinkedIn - ${p.fecha}]`,
+        contenido: p.contenido.trim() || `[Post de LinkedIn - ${p.fecha}]`,
         urlLinkedIn: p.urlLinkedIn,
         estado: 'publicado',
         fechaProgramada: p.fecha || null,
         esHistorico: true,
+        archivo: p.archivo || null,
         metricas: {
           impresiones: p.impresiones,
           reacciones: p.reacciones,
@@ -282,71 +330,68 @@ function ImportLinkedInModal({ onClose }) {
       });
     });
     setDone(true);
-    setImporting(false);
   }
+
+  const valid = parsed.filter(p => !p.error);
 
   return (
     <Modal title="Importar posts desde LinkedIn" onClose={onClose} wide>
       {!done ? (
         <div className="space-y-4">
           <p className="text-sm text-gray-500">
-            Selecciona los archivos Excel exportados desde LinkedIn (uno por publicación). Puedes seleccionar varios a la vez.
+            Selecciona los archivos Excel exportados desde LinkedIn. Puedes seleccionar varios a la vez.
           </p>
           <input
-            ref={fileRef}
-            type="file"
-            accept=".xlsx"
-            multiple
-            onChange={handleFiles}
+            type="file" accept=".xlsx" multiple onChange={handleExcelFiles}
             className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
           />
           {parsed.length > 0 && (
-            <div className="border border-gray-100 rounded-lg overflow-hidden">
-              <table className="w-full text-xs">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="text-left px-3 py-2 text-gray-400 font-medium">Fecha</th>
-                    <th className="text-right px-3 py-2 text-gray-400 font-medium">Impresiones</th>
-                    <th className="text-right px-3 py-2 text-gray-400 font-medium">Reacciones</th>
-                    <th className="text-right px-3 py-2 text-gray-400 font-medium">Comentarios</th>
-                    <th className="text-left px-3 py-2 text-gray-400 font-medium">URL</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {parsed.map((p, i) => p.error ? (
-                    <tr key={i} className="bg-red-50">
-                      <td colSpan={5} className="px-3 py-2 text-red-400">Error al leer: {p.fileName}</td>
-                    </tr>
-                  ) : (
-                    <tr key={i}>
-                      <td className="px-3 py-2 text-gray-600">{p.fecha || '—'}</td>
-                      <td className="px-3 py-2 text-right text-gray-600">{p.impresiones.toLocaleString()}</td>
-                      <td className="px-3 py-2 text-right text-gray-600">{p.reacciones}</td>
-                      <td className="px-3 py-2 text-right text-gray-600">{p.comentarios}</td>
-                      <td className="px-3 py-2 text-gray-400 truncate max-w-[150px]">
+            <div className="space-y-4 max-h-[55vh] overflow-y-auto pr-1">
+              {parsed.map((p, i) => p.error ? (
+                <div key={i} className="p-3 bg-red-50 rounded-lg text-xs text-red-400">Error al leer: {p.fileName}</div>
+              ) : (
+                <div key={i} className="border border-gray-100 rounded-lg p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-gray-500">{p.fecha || p.fileName}</span>
+                    <div className="flex gap-3 text-xs text-gray-400">
+                      <span>{p.impresiones.toLocaleString()} imp.</span>
+                      <span>{p.reacciones} react.</span>
+                      <span>{p.comentarios} com.</span>
+                      {p.urlLinkedIn && (
                         <a href={p.urlLinkedIn} target="_blank" rel="noreferrer" className="text-blue-500 hover:underline" onClick={e => e.stopPropagation()}>
-                          Ver post
+                          Ver en LinkedIn →
                         </a>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 font-medium">Texto del post</label>
+                    <textarea
+                      rows={4}
+                      value={p.contenido}
+                      onChange={e => updateParsed(i, { contenido: e.target.value })}
+                      placeholder="Pega aquí el texto del post de LinkedIn..."
+                      className="w-full mt-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                    />
+                  </div>
+                  <FileUploadField
+                    archivo={p.archivo}
+                    onChange={archivo => updateParsed(i, { archivo })}
+                  />
+                </div>
+              ))}
             </div>
           )}
-          <p className="text-xs text-gray-400">
-            El texto del post se importa vacío — puedes añadirlo después abriendo cada post y pegando el contenido.
-          </p>
           <div className="flex justify-end gap-3 pt-2">
             <button onClick={onClose} className="border border-gray-200 text-gray-600 text-sm px-4 py-2 rounded-lg hover:bg-gray-50">
               Cancelar
             </button>
             <button
               onClick={handleImport}
-              disabled={parsed.filter(p => !p.error).length === 0 || importing}
+              disabled={valid.length === 0}
               className="bg-blue-600 hover:bg-blue-700 text-white text-sm px-6 py-2 rounded-lg disabled:opacity-40"
             >
-              Importar {parsed.filter(p => !p.error).length > 0 ? `${parsed.filter(p => !p.error).length} posts` : ''}
+              Importar {valid.length > 0 ? `${valid.length} posts` : ''}
             </button>
           </div>
         </div>
@@ -522,6 +567,19 @@ export function Biblioteca() {
                 className="mt-2 inline-block text-xs text-blue-500 hover:underline">
                 Ver post en LinkedIn →
               </a>
+            )}
+            {selectedPost.archivo && (
+              <div className="mt-3">
+                {selectedPost.archivo.tipo?.startsWith('image/') ? (
+                  <img src={selectedPost.archivo.dataUrl} alt="" className="w-full rounded-lg border border-gray-100 object-contain max-h-48" />
+                ) : (
+                  <a href={selectedPost.archivo.dataUrl} download={selectedPost.archivo.nombre}
+                    className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg text-xs text-gray-600 hover:bg-gray-100">
+                    <span>📎</span>
+                    <span className="truncate">{selectedPost.archivo.nombre}</span>
+                  </a>
+                )}
+              </div>
             )}
             {selectedPost.metricas && (
               <div className="mt-4 p-3 bg-gray-50 rounded-lg grid grid-cols-2 gap-2 text-xs">
