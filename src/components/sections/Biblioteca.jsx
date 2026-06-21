@@ -510,7 +510,8 @@ export function Biblioteca() {
                 <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase w-36">Categoría</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase w-28">Estado</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase w-28">Fecha</th>
-                <th className="text-right px-6 py-3 text-xs font-medium text-gray-400 uppercase w-24">Impresiones</th>
+                <th className="text-right px-4 py-3 text-xs font-medium text-gray-400 uppercase w-24">Impresiones</th>
+                <th className="text-right px-6 py-3 text-xs font-medium text-gray-400 uppercase w-24">Reacciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -529,8 +530,11 @@ export function Biblioteca() {
                     <td className="px-4 py-3">{cat && <CategoryBadge category={cat} />}</td>
                     <td className="px-4 py-3"><StatusBadge estado={post.estado} /></td>
                     <td className="px-4 py-3 text-xs text-gray-400">{post.fechaProgramada ? formatDate(post.fechaProgramada) : '—'}</td>
-                    <td className="px-6 py-3 text-right text-sm text-gray-600">
+                    <td className="px-4 py-3 text-right text-sm text-gray-600">
                       {post.metricas?.impresiones ? post.metricas.impresiones.toLocaleString() : '—'}
+                    </td>
+                    <td className="px-6 py-3 text-right text-sm text-gray-600">
+                      {post.metricas?.reacciones ? post.metricas.reacciones.toLocaleString() : '—'}
                     </td>
                   </tr>
                 );
