@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import storage from '../services/storage';
 import { buildSamplePosts, defaultCategories, sampleNews, defaultSettings } from '../data/sampleData';
+import { fetchPosts, upsertPost, deletePostFromSupabase } from '../services/supabase';
 
 const AppContext = createContext(null);
 
@@ -26,6 +27,16 @@ export function AppProvider({ children }) {
   // ── POSTS ──────────────────────────────────────────────
   const [posts, setPosts] = useState(() => storage.get('posts') || []);
 
+  // Carga posts desde Supabase al iniciar
+  useEffect(() => {
+    fetchPosts().then(remotePosts => {
+      if (remotePosts && remotePosts.length > 0) {
+        storage.set('posts', remotePosts);
+        setPosts(remotePosts);
+      }
+    }).catch(() => {});
+  }, []);
+
   const savePosts = useCallback((newPosts) => {
     storage.set('posts', newPosts);
     setPosts(newPosts);
@@ -34,18 +45,23 @@ export function AppProvider({ children }) {
   const addPost = useCallback((post) => {
     const newPost = { ...post, id: genId(), actualizadoEn: new Date().toISOString() };
     savePosts([...posts, newPost]);
+    upsertPost(newPost).catch(() => {});
     return newPost;
   }, [posts, savePosts]);
 
   const updatePost = useCallback((id, changes) => {
-    savePosts(posts.map(p => p.id === id
+    const updated = posts.map(p => p.id === id
       ? { ...p, ...changes, actualizadoEn: new Date().toISOString() }
       : p
-    ));
+    );
+    savePosts(updated);
+    const updatedPost = updated.find(p => p.id === id);
+    if (updatedPost) upsertPost(updatedPost).catch(() => {});
   }, [posts, savePosts]);
 
   const deletePost = useCallback((id) => {
     savePosts(posts.filter(p => p.id !== id));
+    deletePostFromSupabase(id).catch(() => {});
   }, [posts, savePosts]);
 
   // ── CATEGORIES ─────────────────────────────────────────
