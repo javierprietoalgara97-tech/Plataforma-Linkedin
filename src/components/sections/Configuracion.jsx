@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import storage from '../../services/storage';
+import { upsertPost } from '../../services/supabase';
 
 export function Configuracion() {
   const { settings, updateSettings } = useApp();
@@ -11,6 +12,7 @@ export function Configuracion() {
   const [testAnth, setTestAnth] = useState('');
   const [testSupa, setTestSupa] = useState('');
   const [saved, setSaved] = useState(false);
+  const [syncStatus, setSyncStatus] = useState('');
 
   function setField(path, value) {
     const parts = path.split('.');
@@ -78,6 +80,19 @@ export function Configuracion() {
     if (!window.confirm('¿Resetear todos los datos? Perderás tus posts, categorías y configuración.')) return;
     storage.clear();
     window.location.reload();
+  }
+
+  async function syncToSupabase() {
+    const posts = storage.get('posts') || [];
+    if (posts.length === 0) { alert('No hay posts en local para sincronizar.'); return; }
+    setSyncStatus('Sincronizando...');
+    try {
+      await Promise.all(posts.map(p => upsertPost(p)));
+      setSyncStatus(`✅ ${posts.length} posts sincronizados`);
+    } catch {
+      setSyncStatus('❌ Error al sincronizar');
+    }
+    setTimeout(() => setSyncStatus(''), 4000);
   }
 
   function importData(e) {
@@ -220,6 +235,13 @@ export function Configuracion() {
             className="border border-red-200 hover:bg-red-50 text-red-600 text-sm px-4 py-2 rounded-lg">
             Resetear datos
           </button>
+        </div>
+        <div className="flex items-center gap-3">
+          <button onClick={syncToSupabase}
+            className="flex-1 border border-green-200 hover:bg-green-50 text-green-700 text-sm py-2 rounded-lg">
+            Sincronizar posts con Supabase
+          </button>
+          {syncStatus && <span className="text-xs text-gray-600">{syncStatus}</span>}
         </div>
         <p className="text-xs text-gray-400">Los datos se guardan en tu navegador. Exporta regularmente como copia de seguridad.</p>
       </Section>
