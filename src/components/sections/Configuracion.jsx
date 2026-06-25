@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import storage from '../../services/storage';
-import { upsertPost } from '../../services/supabase';
 
 export function Configuracion() {
-  const { settings, updateSettings } = useApp();
+  const { settings, updateSettings, syncWithSupabase } = useApp();
   const [form, setForm] = useState({
     ...settings,
     perfil: { ...settings.perfil },
@@ -83,14 +82,12 @@ export function Configuracion() {
   }
 
   async function syncToSupabase() {
-    const posts = storage.get('posts') || [];
-    if (posts.length === 0) { alert('No hay posts en local para sincronizar.'); return; }
     setSyncStatus('Sincronizando...');
     try {
-      await Promise.all(posts.map(p => upsertPost(p)));
-      setSyncStatus(`✅ ${posts.length} posts sincronizados`);
-    } catch {
-      setSyncStatus('❌ Error al sincronizar');
+      const total = await syncWithSupabase();
+      setSyncStatus(`✅ ${total} posts sincronizados`);
+    } catch (e) {
+      setSyncStatus(`❌ ${e.message || 'Error al sincronizar'}`);
     }
     setTimeout(() => setSyncStatus(''), 4000);
   }

@@ -64,6 +64,27 @@ export function AppProvider({ children }) {
     deletePostFromSupabase(id).catch(() => {});
   }, [posts, savePosts]);
 
+  const syncWithSupabase = useCallback(async () => {
+    const remotePosts = await fetchPosts();
+    if (remotePosts === null) throw new Error('Sin conexión con Supabase');
+
+    const merged = new Map(posts.map(p => [p.id, p]));
+    remotePosts.forEach(remote => {
+      const local = merged.get(remote.id);
+      if (!local) {
+        merged.set(remote.id, remote);
+      } else {
+        const localNewer = new Date(local.actualizadoEn || 0) >= new Date(remote.actualizadoEn || 0);
+        if (!localNewer) merged.set(remote.id, remote);
+      }
+    });
+
+    const mergedPosts = Array.from(merged.values());
+    savePosts(mergedPosts);
+    await Promise.all(mergedPosts.map(p => upsertPost(p)));
+    return mergedPosts.length;
+  }, [posts, savePosts]);
+
   // ── CATEGORIES ─────────────────────────────────────────
   const [categories, setCategories] = useState(() => storage.get('categories') || defaultCategories);
 
@@ -104,7 +125,7 @@ export function AppProvider({ children }) {
   const value = {
     section, navigateTo,
     chatContext, setChatContext,
-    posts, addPost, updatePost, deletePost,
+    posts, addPost, updatePost, deletePost, syncWithSupabase,
     categories, addCategory, updateCategory, deleteCategory,
     settings, updateSettings,
     genId,
