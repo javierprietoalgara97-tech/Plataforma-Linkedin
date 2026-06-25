@@ -4,7 +4,6 @@ const NAV = [
   { id: 'dashboard', label: 'Dashboard', icon: '⊞' },
   { id: 'chat', label: 'Chat IA', icon: '✦' },
   { id: 'calendario', label: 'Calendario', icon: '▦' },
-  { id: 'investigacion', label: 'Investigación', icon: '◈' },
   { id: 'biblioteca', label: 'Biblioteca', icon: '▤' },
   { id: 'analiticas', label: 'Analíticas', icon: '◎' },
 ];
