@@ -23,9 +23,9 @@ function AppContent() {
   const Section = SECTIONS[section] || Dashboard;
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="flex min-h-screen bg-gray-50 overflow-x-hidden">
       <Sidebar />
-      <main className="md:ml-56 flex-1 min-h-screen pb-16 md:pb-0">
+      <main className="md:ml-56 flex-1 min-h-screen pt-14 md:pt-0 w-full overflow-x-hidden">
         <Section />
       </main>
     </div>
